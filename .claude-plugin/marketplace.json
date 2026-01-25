@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "agent-monitor",
-      "source": ".",
+      "source": "./",
       "description": "Claude Code hooks for agent-dashboard monitoring server",
       "version": "1.0.0",
       "author": {
