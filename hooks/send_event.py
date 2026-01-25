@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Send Claude Code hook events to the monitoring server."""
+
+import json
+import os
+import platform
+import socket
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.error import URLError
+from urllib.request import Request, urlopen
+
+SERVER_URL = os.environ.get("AGENT_MONITOR_URL", "http://localhost:8787")
+TIMEOUT = 5
+MAX_TRANSCRIPT_LINES = 100
+
+
+def read_transcript(transcript_path: str | None) -> list[dict]:
+    """Read recent messages from transcript JSONL file."""
+    if not transcript_path:
+        return []
+
+    path = Path(transcript_path)
+    if not path.exists():
+        return []
+
+    messages = []
+    try:
+        with path.open() as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    entry_type = entry.get("type")
+                    # Skip non-message entries
+                    if entry_type not in ("user", "assistant"):
+                        continue
+                    messages.append(entry)
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        return []
+
+    return messages[-MAX_TRANSCRIPT_LINES:]
+
+
+def extract_text_content(content) -> str | None:
+    """Extract text content from message content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        texts = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    texts.append(block.get("text", ""))
+            elif isinstance(block, str):
+                texts.append(block)
+        return "\n".join(texts) if texts else None
+    return None
+
+
+def simplify_transcript(entries: list[dict]) -> list[dict]:
+    """Simplify transcript entries for sending to server."""
+    simplified = []
+
+    for entry in entries:
+        entry_type = entry.get("type")
+        if entry_type not in ("user", "assistant"):
+            continue
+
+        # Get the message object
+        message = entry.get("message", {})
+        role = message.get("role", entry_type)
+        content = message.get("content")
+        timestamp = entry.get("timestamp")
+
+        # Extract text content
+        text = extract_text_content(content)
+
+        # Also extract tool_use from assistant messages
+        tool_uses = []
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    tool_uses.append({
+                        "tool_name": block.get("name"),
+                        "tool_input": block.get("input"),
+                        "tool_use_id": block.get("id"),
+                    })
+
+        # Add text message if present
+        if text:
+            simplified.append({
+                "type": "message",
+                "role": role,
+                "text": text[:2000],
+                "uuid": entry.get("uuid"),
+                "timestamp": timestamp,
+            })
+
+        # Add tool uses as separate entries
+        for tool in tool_uses:
+            simplified.append({
+                "type": "tool_use",
+                "role": "assistant",
+                "tool_name": tool["tool_name"],
+                "tool_input": tool["tool_input"],
+                "tool_use_id": tool["tool_use_id"],
+                "uuid": entry.get("uuid"),
+                "timestamp": timestamp,
+            })
+
+    return simplified
+
+
+def get_host_info() -> dict:
+    """Get host identification info."""
+    return {
+        "hostname": socket.gethostname(),
+        "platform": platform.system(),
+        "user": os.environ.get("USER", os.environ.get("USERNAME", "unknown")),
+    }
+
+
+def send_event(data: dict) -> None:
+    host_info = get_host_info()
+    hook_event = data.get("hook_event_name")
+
+    event = {
+        "session_id": data.get("session_id", "unknown"),
+        "hook_event": hook_event,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "tool_name": data.get("tool_name"),
+        "tool_input": data.get("tool_input"),
+        "cwd": data.get("cwd"),
+        "notification_type": data.get("notification_type"),
+        "hostname": host_info["hostname"],
+        "platform": host_info["platform"],
+        "user": host_info["user"],
+        "extra": {},
+        "transcript": [],
+    }
+
+    # Add source for SessionStart
+    if "source" in data:
+        event["extra"]["source"] = data["source"]
+
+    # Add reason for SessionEnd
+    if "reason" in data:
+        event["extra"]["reason"] = data["reason"]
+
+    # Read transcript on Stop event (when Claude finishes a response)
+    if hook_event in ("Stop", "SessionStart", "PostToolUse"):
+        transcript_path = data.get("transcript_path")
+        # Debug: log transcript info to stderr (won't affect hook output)
+        if transcript_path:
+            path = Path(transcript_path)
+            if path.exists():
+                entries = read_transcript(transcript_path)
+                simplified = simplify_transcript(entries)
+                event["transcript"] = simplified
+                print(f"[agent-monitor] {hook_event}: read {len(entries)} raw, {len(simplified)} simplified from {transcript_path}", file=sys.stderr)
+            else:
+                print(f"[agent-monitor] {hook_event}: transcript file not found: {transcript_path}", file=sys.stderr)
+        else:
+            print(f"[agent-monitor] {hook_event}: no transcript_path provided", file=sys.stderr)
+
+    payload = json.dumps(event).encode("utf-8")
+    request = Request(
+        f"{SERVER_URL}/api/events",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=TIMEOUT) as response:
+            response.read()
+    except URLError:
+        pass  # Silent fail - don't break Claude Code workflow
+
+
+def main() -> None:
+    try:
+        data = json.load(sys.stdin)
+        send_event(data)
+    except json.JSONDecodeError:
+        pass
+    except Exception:
+        pass
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,24 @@
+{
+  "name": "agent-dashboard",
+  "owner": {
+    "name": "daliborhlava",
+    "email": "dalibor.hlava@gmail.com"
+  },
+  "metadata": {
+    "description": "Real-time monitoring dashboard for AI coding agents"
+  },
+  "plugins": [
+    {
+      "name": "agent-monitor",
+      "source": ".",
+      "description": "Claude Code hooks for agent-dashboard monitoring server",
+      "version": "1.0.0",
+      "author": {
+        "name": "daliborhlava"
+      },
+      "repository": "https://github.com/daliborhlava/agent-dashboard-client-claude-code",
+      "keywords": ["monitoring", "dashboard", "hooks", "agent"],
+      "category": "monitoring"
+    }
+  ]
+}
