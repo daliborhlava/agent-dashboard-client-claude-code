@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-SERVER_URL = os.environ.get("AGENT_MONITOR_URL", "http://localhost:8787")
+SERVER_URL = os.environ.get("AGENT_DASHBOARD_URL", "http://localhost:8787")
 TIMEOUT = 5
 MAX_TRANSCRIPT_LINES = 100
 

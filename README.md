@@ -23,7 +23,7 @@ Sends real-time events to a central dashboard including:
 Set the dashboard server URL via environment variable:
 
 ```bash
-export AGENT_MONITOR_URL="http://your-server:8787"
+export AGENT_DASHBOARD_URL="http://your-server:8787"
 ```
 
 Default: `http://localhost:8787`
