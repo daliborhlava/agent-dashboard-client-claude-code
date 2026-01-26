@@ -12,7 +12,7 @@
       "name": "agent-dashboard-client",
       "source": "./",
       "description": "Claude Code hooks for agent-dashboard monitoring server",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "author": {
         "name": "daliborhlava"
       },
