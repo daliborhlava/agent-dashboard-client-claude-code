@@ -126,6 +126,34 @@ def get_host_info() -> dict:
     }
 
 
+def extract_usage_from_transcript(entries: list[dict]) -> dict:
+    """Extract cumulative token usage from transcript entries."""
+    total_input = 0
+    total_output = 0
+    total_cache_read = 0
+    total_cache_create = 0
+
+    for entry in entries:
+        if entry.get("type") != "assistant":
+            continue
+        message = entry.get("message", {})
+        usage = message.get("usage", {})
+        total_input += usage.get("input_tokens", 0)
+        total_output += usage.get("output_tokens", 0)
+        total_cache_read += usage.get("cache_read_input_tokens", 0)
+        total_cache_create += usage.get("cache_creation_input_tokens", 0)
+
+    if total_input == 0 and total_output == 0:
+        return {}
+
+    return {
+        "input_tokens": total_input,
+        "output_tokens": total_output,
+        "cache_read_tokens": total_cache_read,
+        "cache_create_tokens": total_cache_create,
+    }
+
+
 def send_event(data: dict) -> None:
     host_info = get_host_info()
     hook_event = data.get("hook_event_name")
@@ -145,6 +173,15 @@ def send_event(data: dict) -> None:
         "transcript": [],
     }
 
+    # Add error_message for PostToolUseFailure
+    if hook_event == "PostToolUseFailure":
+        event["error_message"] = data.get("error") or data.get("error_message")
+
+    # Add subagent info for SubagentStart/SubagentStop
+    if hook_event in ("SubagentStart", "SubagentStop"):
+        event["subagent_id"] = data.get("subagent_id") or data.get("agent_id")
+        event["subagent_task"] = data.get("task") or data.get("description")
+
     # Add source for SessionStart
     if "source" in data:
         event["extra"]["source"] = data["source"]
@@ -153,16 +190,21 @@ def send_event(data: dict) -> None:
     if "reason" in data:
         event["extra"]["reason"] = data["reason"]
 
-    # Read transcript on Stop event (when Claude finishes a response)
-    if hook_event in ("Stop", "SessionStart", "PostToolUse"):
+    # Read transcript on certain events
+    if hook_event in ("Stop", "SessionStart", "PostToolUse", "PostToolUseFailure"):
         transcript_path = data.get("transcript_path")
-        # Debug: log transcript info to stderr (won't affect hook output)
         if transcript_path:
             path = Path(transcript_path)
             if path.exists():
                 entries = read_transcript(transcript_path)
                 simplified = simplify_transcript(entries)
                 event["transcript"] = simplified
+
+                # Extract token usage
+                usage = extract_usage_from_transcript(entries)
+                if usage:
+                    event["extra"]["usage"] = usage
+
                 print(f"[agent-monitor] {hook_event}: read {len(entries)} raw, {len(simplified)} simplified from {transcript_path}", file=sys.stderr)
             else:
                 print(f"[agent-monitor] {hook_event}: transcript file not found: {transcript_path}", file=sys.stderr)
