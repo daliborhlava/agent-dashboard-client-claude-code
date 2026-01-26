@@ -205,11 +205,11 @@ def send_event(data: dict) -> None:
                 if usage:
                     event["extra"]["usage"] = usage
 
-                print(f"[agent-monitor] {hook_event}: read {len(entries)} raw, {len(simplified)} simplified from {transcript_path}", file=sys.stderr)
+                print(f"[agent-dashboard] {hook_event}: read {len(entries)} raw, {len(simplified)} simplified from {transcript_path}", file=sys.stderr)
             else:
-                print(f"[agent-monitor] {hook_event}: transcript file not found: {transcript_path}", file=sys.stderr)
+                print(f"[agent-dashboard] {hook_event}: transcript file not found: {transcript_path}", file=sys.stderr)
         else:
-            print(f"[agent-monitor] {hook_event}: no transcript_path provided", file=sys.stderr)
+            print(f"[agent-dashboard] {hook_event}: no transcript_path provided", file=sys.stderr)
 
     payload = json.dumps(event).encode("utf-8")
     request = Request(
