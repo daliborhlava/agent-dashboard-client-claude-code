@@ -15,7 +15,7 @@ Sends real-time events to a central dashboard including:
 /plugin marketplace add daliborhlava/agent-dashboard-client-claude-code
 
 # Install the plugin
-/plugin install agent-monitor@agent-dashboard
+/plugin install agent-dashboard-client@agent-dashboard
 ```
 
 ## Configuration
