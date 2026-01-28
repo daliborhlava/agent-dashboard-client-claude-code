@@ -160,6 +160,7 @@ def send_event(data: dict) -> None:
 
     event = {
         "session_id": data.get("session_id", "unknown"),
+        "monitor_id": os.environ.get("AGENT_MONITOR_ID"),
         "hook_event": hook_event,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "tool_name": data.get("tool_name"),
