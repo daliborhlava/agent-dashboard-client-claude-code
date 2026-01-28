@@ -170,6 +170,8 @@ def send_event(data: dict) -> None:
         "hostname": host_info["hostname"],
         "platform": host_info["platform"],
         "user": host_info["user"],
+        "model": data.get("model"),
+        "permission_mode": data.get("permission_mode"),
         "extra": {},
         "transcript": [],
     }
@@ -182,6 +184,7 @@ def send_event(data: dict) -> None:
     if hook_event in ("SubagentStart", "SubagentStop"):
         event["subagent_id"] = data.get("subagent_id") or data.get("agent_id")
         event["subagent_task"] = data.get("task") or data.get("description")
+        event["subagent_type"] = data.get("agent_type")
 
     # Add source for SessionStart
     if "source" in data:

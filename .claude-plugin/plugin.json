@@ -1,7 +1,7 @@
 {
   "name": "agent-dashboard-client",
   "description": "Claude Code hooks for agent-dashboard monitoring server. Sends real-time events including tool usage, transcripts, and session state to a central monitoring dashboard.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "author": {
     "name": "daliborhlava"
   },
