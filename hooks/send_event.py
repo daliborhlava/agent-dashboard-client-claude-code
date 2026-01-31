@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 SERVER_URL = os.environ.get("AGENT_DASHBOARD_URL", "http://localhost:8787")
 TIMEOUT = 5
 MAX_TRANSCRIPT_LINES = 100
+CLIENT_VERSION = "1.0.6"
 
 
 def read_transcript(transcript_path: str | None) -> list[dict]:
@@ -192,6 +193,9 @@ def send_event(data: dict) -> None:
 
     if hook_event == "UserPromptSubmit":
         event["prompt"] = data.get("prompt")
+
+    if hook_event == "SessionStart":
+        event["client_version"] = CLIENT_VERSION
 
     if "source" in data:
         event["extra"]["source"] = data["source"]
