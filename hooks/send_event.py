@@ -165,7 +165,8 @@ def send_event(data: dict) -> None:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "tool_name": data.get("tool_name"),
         "tool_input": data.get("tool_input"),
-        "tool_response": data.get("tool_response"),  # Available on PostToolUse
+        "tool_response": data.get("tool_response"),
+        "tool_use_id": data.get("tool_use_id"),
         "cwd": data.get("cwd"),
         "notification_type": data.get("notification_type"),
         "hostname": host_info["hostname"],
@@ -177,25 +178,27 @@ def send_event(data: dict) -> None:
         "transcript": [],
     }
 
-    # Add error_message for PostToolUseFailure
     if hook_event == "PostToolUseFailure":
         event["error_message"] = data.get("error") or data.get("error_message")
+        event["is_interrupt"] = data.get("is_interrupt", False)
 
-    # Add subagent info for SubagentStart/SubagentStop
     if hook_event in ("SubagentStart", "SubagentStop"):
         event["subagent_id"] = data.get("subagent_id") or data.get("agent_id")
         event["subagent_task"] = data.get("task") or data.get("description")
         event["subagent_type"] = data.get("agent_type")
 
-    # Add source for SessionStart
+    if hook_event in ("Stop", "SubagentStop"):
+        event["stop_hook_active"] = data.get("stop_hook_active", False)
+
+    if hook_event == "UserPromptSubmit":
+        event["prompt"] = data.get("prompt")
+
     if "source" in data:
         event["extra"]["source"] = data["source"]
 
-    # Add reason for SessionEnd
     if "reason" in data:
         event["extra"]["reason"] = data["reason"]
 
-    # Read transcript on certain events
     if hook_event in ("Stop", "SessionStart", "PostToolUse", "PostToolUseFailure"):
         transcript_path = data.get("transcript_path")
         if transcript_path:
@@ -205,16 +208,11 @@ def send_event(data: dict) -> None:
                 simplified = simplify_transcript(entries)
                 event["transcript"] = simplified
 
-                # Extract token usage
                 usage = extract_usage_from_transcript(entries)
                 if usage:
                     event["extra"]["usage"] = usage
 
-                print(f"[agent-dashboard] {hook_event}: read {len(entries)} raw, {len(simplified)} simplified from {transcript_path}", file=sys.stderr)
-            else:
-                print(f"[agent-dashboard] {hook_event}: transcript file not found: {transcript_path}", file=sys.stderr)
-        else:
-            print(f"[agent-dashboard] {hook_event}: no transcript_path provided", file=sys.stderr)
+                print(f"[agent-dashboard] {hook_event}: {len(simplified)} entries", file=sys.stderr)
 
     payload = json.dumps(event).encode("utf-8")
     request = Request(
