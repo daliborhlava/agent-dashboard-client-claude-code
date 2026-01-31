@@ -165,6 +165,7 @@ def send_event(data: dict) -> None:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "tool_name": data.get("tool_name"),
         "tool_input": data.get("tool_input"),
+        "tool_response": data.get("tool_response"),  # Available on PostToolUse
         "cwd": data.get("cwd"),
         "notification_type": data.get("notification_type"),
         "hostname": host_info["hostname"],
